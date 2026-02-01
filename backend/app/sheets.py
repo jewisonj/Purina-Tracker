@@ -2,6 +2,7 @@
 
 import io
 import json
+import logging
 import time
 import math
 from datetime import datetime, timezone
@@ -14,6 +15,8 @@ from google.oauth2.service_account import Credentials as SACredentials
 
 from .config import get_settings
 from .models import Product, LogEntry
+
+logger = logging.getLogger(__name__)
 
 # Column indices (0-based) in the Inventory tab
 COL = {
@@ -38,7 +41,10 @@ TAB_LOG = "Inventory Log"
 TAB_ARCHIVE = "Price List Archive"
 TAB_INVOICES = "Invoices"
 
-DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file"]
+DRIVE_SCOPES = [
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/drive.file",
+]
 
 
 def ceil_quarter(value: float) -> float:
@@ -324,15 +330,25 @@ class SheetsService:
         if not folder_id:
             raise RuntimeError("GOOGLE_DRIVE_FOLDER_ID not set")
 
+        logger.info("Uploading %s (%d bytes) to Drive folder %s", filename, len(file_bytes), folder_id)
+
         drive = self._build_drive_service()
         file_metadata = {"name": filename, "parents": [folder_id]}
         media = MediaIoBaseUpload(io.BytesIO(file_bytes), mimetype=mime_type, resumable=False)
 
         uploaded = drive.files().create(
-            body=file_metadata, media_body=media, fields="id, webViewLink"
+            body=file_metadata, media_body=media, fields="id, webViewLink, webContentLink"
         ).execute()
 
-        return uploaded.get("webViewLink", "")
+        file_id = uploaded.get("id", "")
+        drive_url = uploaded.get("webViewLink") or uploaded.get("webContentLink") or ""
+
+        # Fallback: construct a direct link from the file ID
+        if not drive_url and file_id:
+            drive_url = f"https://drive.google.com/file/d/{file_id}/view"
+
+        logger.info("Drive upload success: id=%s url=%s", file_id, drive_url)
+        return drive_url
 
     def file_invoice(
         self,
@@ -349,16 +365,26 @@ class SheetsService:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
         drive_url = ""
-        if pdf_bytes and self._settings.google_drive_folder_id:
-            filename = f"{inv_num}_{customer_name.replace(' ', '_')}_{invoice_date.replace('-', '')}.pdf"
-            drive_url = self.upload_to_drive(pdf_bytes, filename)
+        drive_error = ""
+        if not self._settings.google_drive_folder_id:
+            drive_error = "GOOGLE_DRIVE_FOLDER_ID is not configured"
+            logger.warning("GOOGLE_DRIVE_FOLDER_ID not set — skipping Drive upload")
+        elif pdf_bytes:
+            name_part = customer_name.strip().replace(" ", "_")[:20]
+            date_part = invoice_date.replace("-", "")
+            filename = f"Invoice_{name_part}_{date_part}.pdf"
+            try:
+                drive_url = self.upload_to_drive(pdf_bytes, filename)
+            except Exception as exc:
+                drive_error = str(exc)
+                logger.error("Drive upload failed for %s: %s", inv_num, exc, exc_info=True)
 
         ws.append_row(
             [inv_num, invoice_date, customer_name, items_summary, f"${total:.2f}", "Yes" if paid else "No", now, drive_url],
             value_input_option="USER_ENTERED",
         )
 
-        return {"invoice_number": inv_num, "drive_url": drive_url}
+        return {"invoice_number": inv_num, "drive_url": drive_url, "drive_error": drive_error}
 
 
 # Singleton instance

@@ -51,8 +51,14 @@ async def file_invoice(
         pdf_bytes=pdf_bytes,
     )
 
+    drive_error = result.get("drive_error", "")
+    message = "Invoice filed successfully"
+    if drive_error:
+        message = f"Invoice logged but Drive upload failed: {drive_error}"
+
     return FileInvoiceResponse(
-        message="Invoice filed successfully",
+        message=message,
         drive_url=result.get("drive_url", ""),
         invoice_number=result.get("invoice_number", ""),
+        drive_error=drive_error,
     )

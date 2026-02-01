@@ -49,6 +49,7 @@ primary_region = "ord"  # Chicago - closest to Platteville, WI
 #    fly secrets set JWT_SECRET=your-random-secret
 #    fly secrets set GOOGLE_SHEET_ID=1fTIf-pbn0zeihe6PSGaeD_EhSOo3S7JMJK-OxYkLrjE
 #    fly secrets set GOOGLE_CREDENTIALS_JSON='{"type":"service_account",...}'
+#    fly secrets set GOOGLE_DRIVE_FOLDER_ID=your-drive-folder-id
 #
 # 3. Deploy:
 #    fly deploy

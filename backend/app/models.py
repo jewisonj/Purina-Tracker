@@ -83,3 +83,4 @@ class FileInvoiceResponse(BaseModel):
     message: str
     drive_url: str = ""
     invoice_number: str = ""
+    drive_error: str = ""

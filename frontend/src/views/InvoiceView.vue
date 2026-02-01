@@ -96,8 +96,8 @@ function validateInvoice(): LineItem[] | null {
   return validItems
 }
 
-/** Generate a jsPDF document from the current invoice data. */
-function generatePDFDoc(validItems: LineItem[]): jsPDF {
+/** Generate a jsPDF document from the current invoice data. Includes PAID stamp if isPaid is true. */
+function generatePDFDoc(validItems: LineItem[], isPaid = false): jsPDF {
   const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.getWidth()
 
@@ -153,10 +153,10 @@ function generatePDFDoc(validItems: LineItem[]): jsPDF {
       fontSize: 10,
     },
     columnStyles: {
-      0: { cellWidth: 90 },
+      0: { cellWidth: 'auto' },
       1: { cellWidth: 20, halign: 'center' },
-      2: { cellWidth: 35, halign: 'right' },
-      3: { cellWidth: 35, halign: 'right' },
+      2: { cellWidth: 32, halign: 'right' },
+      3: { cellWidth: 32, halign: 'right' },
     },
     didParseCell: (data: any) => {
       // Bold the total row
@@ -173,6 +173,20 @@ function generatePDFDoc(validItems: LineItem[]): jsPDF {
   doc.setFont('helvetica', 'italic')
   doc.text('Thank you for your business!', pageWidth / 2, finalY + 12, { align: 'center' })
 
+  // PAID stamp
+  if (isPaid) {
+    doc.saveGraphicsState()
+    doc.setGState(new (doc as any).GState({ opacity: 0.18 }))
+    doc.setFontSize(80)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(196, 18, 48)
+    const cx = pageWidth / 2
+    const cy = 140
+    doc.text('PAID', cx, cy, { align: 'center', angle: 35 })
+    doc.restoreGraphicsState()
+    doc.setTextColor(0, 0, 0)
+  }
+
   return doc
 }
 
@@ -180,7 +194,7 @@ function downloadPDF() {
   const validItems = validateInvoice()
   if (!validItems) return
 
-  const doc = generatePDFDoc(validItems)
+  const doc = generatePDFDoc(validItems, paid.value)
   const datePart = invoiceDate.value.replace(/-/g, '')
   const namePart = customerName.value.trim().replace(/\s+/g, '_').substring(0, 20)
   doc.save(`Invoice_${namePart}_${datePart}.pdf`)
@@ -196,7 +210,7 @@ async function fileInvoiceHandler() {
 
   filingInvoice.value = true
   try {
-    const doc = generatePDFDoc(validItems)
+    const doc = generatePDFDoc(validItems, paid.value)
     const pdfBlob = doc.output('blob')
 
     const invoiceData = {
@@ -215,11 +229,15 @@ async function fileInvoiceHandler() {
 
     const result = await fileInvoice(invoiceData, pdfBlob)
 
-    let detail = `${result.invoice_number} filed.`
-    if (result.drive_url) {
-      detail += ' PDF uploaded to Drive.'
+    if (result.drive_error) {
+      toast.add({ severity: 'warn', summary: 'Drive Upload Failed', detail: `${result.invoice_number} logged to Sheets but Drive failed: ${result.drive_error}`, life: 6000 })
+    } else {
+      let detail = `${result.invoice_number} filed.`
+      if (result.drive_url) {
+        detail += ' PDF uploaded to Drive.'
+      }
+      toast.add({ severity: 'success', summary: 'Invoice Filed', detail, life: 4000 })
     }
-    toast.add({ severity: 'success', summary: 'Invoice Filed', detail, life: 4000 })
   } catch (err: any) {
     toast.add({ severity: 'error', summary: 'Filing Failed', detail: err.message || 'Could not file invoice.', life: 4000 })
   } finally {
