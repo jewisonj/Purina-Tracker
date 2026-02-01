@@ -43,7 +43,12 @@
       "Bash(netstat:*)",
       "Bash(timeout /t 4 /nobreak)",
       "Bash(cat:*)",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(timeout:*)",
+      "mcp__MCP_DOCKER__browser_navigate",
+      "mcp__MCP_DOCKER__browser_type",
+      "mcp__MCP_DOCKER__browser_take_screenshot",
+      "mcp__MCP_DOCKER__browser_close"
     ]
   }
 }
