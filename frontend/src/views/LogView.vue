@@ -68,7 +68,7 @@ function tagSeverity(changeType: string): string {
       </Column>
       <Column field="qty_changed" header="Change" style="width: 80px">
         <template #body="{ data }">
-          <span :style="{ color: data.qty_changed > 0 ? '#28a745' : '#dc3545', fontWeight: 700 }">
+          <span :style="{ color: data.qty_changed > 0 ? '#4ade80' : '#f87171', fontWeight: 700 }">
             {{ data.qty_changed > 0 ? '+' : '' }}{{ data.qty_changed }}
           </span>
         </template>

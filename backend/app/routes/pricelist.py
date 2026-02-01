@@ -14,6 +14,18 @@ router = APIRouter(tags=["pricelist"])
 WANTED_CATEGORIES = {"HORSE", "ALL PURPOSE"}
 
 
+@router.get("/pricelist/archive")
+async def get_archive(user: str = Depends(verify_token)):
+    """Get the Price List Archive tab contents."""
+    svc = get_sheets_service()
+    ws = svc._get_worksheet("Price List Archive")
+    data = ws.get_all_values()
+    return {
+        "headers": data[0] if data else [],
+        "rows": data[1:] if len(data) > 1 else [],
+    }
+
+
 @router.post("/pricelist/import")
 async def import_pricelist(
     file: UploadFile = File(...), user: str = Depends(verify_token)

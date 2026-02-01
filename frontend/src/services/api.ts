@@ -105,6 +105,11 @@ export async function getLowStock(): Promise<Product[]> {
   return request<Product[]>('/inventory/low-stock')
 }
 
+// Price list archive
+export async function getPriceListArchive(): Promise<{ headers: string[]; rows: string[][] }> {
+  return request<{ headers: string[]; rows: string[][] }>('/pricelist/archive')
+}
+
 // Price list import
 export async function importPriceList(file: File): Promise<{ updated: number; new_products: string[]; message: string }> {
   const token = getToken()

@@ -74,16 +74,17 @@ async function handleLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f0f2f5;
+  background: var(--surface-alt);
 }
 
 .login-card {
-  background: white;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 40px;
   width: 100%;
   max-width: 380px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .login-header {
@@ -92,13 +93,13 @@ async function handleLogin() {
 }
 
 .login-header h1 {
-  color: #c41230;
+  color: var(--primary-light);
   font-size: 24px;
   margin-bottom: 8px;
 }
 
 .login-header p {
-  color: #6c757d;
+  color: var(--text-secondary);
   font-size: 14px;
 }
 
@@ -107,7 +108,7 @@ async function handleLogin() {
 }
 
 .error-msg {
-  color: #dc3545;
+  color: var(--danger);
   font-size: 13px;
   text-align: center;
   margin-bottom: 12px;

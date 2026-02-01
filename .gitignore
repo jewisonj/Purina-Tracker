@@ -27,5 +27,8 @@ service-account.json
 *.xlsx
 *.csv
 
+# Build artifacts
+*.tsbuildinfo
+
 # Nested repo
 Purina-Tracker/

@@ -1,24 +1,27 @@
-/* Global styles */
+/* Global styles - Dark theme with Purina red accents */
 :root {
   --primary: #c41230;
   --primary-dark: #a00f28;
-  --surface: #ffffff;
-  --surface-alt: #f8f9fa;
-  --border: #dee2e6;
-  --text: #333333;
-  --text-secondary: #6c757d;
-  --danger: #dc3545;
-  --warning: #ffc107;
-  --success: #28a745;
+  --primary-light: #e8254a;
+  --surface: #1e1a24;
+  --surface-alt: #161218;
+  --surface-card: #241f2a;
+  --surface-hover: #2c2732;
+  --border: #38303e;
+  --text: #e8e2ee;
+  --text-secondary: #988ea0;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #22c55e;
 }
 
 /* Low stock row highlighting */
 .low-stock-row {
-  background-color: #fff3cd !important;
+  background-color: #2a2014 !important;
 }
 
 .out-of-stock-row {
-  background-color: #f8d7da !important;
+  background-color: #2a1418 !important;
 }
 
 /* Quick action buttons */
@@ -31,6 +34,7 @@
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--surface);
+  color: var(--text);
   cursor: pointer;
   font-weight: bold;
   font-size: 16px;
@@ -56,10 +60,11 @@
 }
 
 .summary-card {
-  background: var(--surface);
+  background: var(--surface-card);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 16px 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   min-width: 160px;
 }
 
@@ -88,7 +93,7 @@
   align-items: center;
   height: 56px;
   gap: 32px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .app-nav .brand {

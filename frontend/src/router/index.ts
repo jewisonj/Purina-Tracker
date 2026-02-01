@@ -17,15 +17,9 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/prices',
-      name: 'prices',
-      component: () => import('../views/PricesView.vue'),
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/log',
-      name: 'log',
-      component: () => import('../views/LogView.vue'),
+      path: '/invoice',
+      name: 'invoice',
+      component: () => import('../views/InvoiceView.vue'),
       meta: { requiresAuth: true },
     },
   ],

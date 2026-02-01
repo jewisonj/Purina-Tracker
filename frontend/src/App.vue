@@ -30,8 +30,8 @@ html, body {
 
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: #f0f2f5;
-  color: #333;
+  background: var(--surface-alt);
+  color: var(--text);
 }
 
 .app {

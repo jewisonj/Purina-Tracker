@@ -29,7 +29,14 @@
       "Bash(git branch:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(\"backend/venv/Scripts/python.exe\":*)"
+      "Bash(\"backend/venv/Scripts/python.exe\":*)",
+      "Bash(if not exist \"J:\\\\Purina-Tracker\\\\frontend\\\\src\\\\config\" mkdir \"J:\\\\Purina-Tracker\\\\frontend\\\\src\\\\config\")",
+      "Bash(npm install)",
+      "Bash(backend/venv/Scripts/python.exe:*)",
+      "Bash(del \"J:\\\\Purina-Tracker\\\\update_sheet.py\")",
+      "Bash(git config:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx vite build)"
     ]
   }
 }
