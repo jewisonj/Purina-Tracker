@@ -274,34 +274,51 @@ Base URL: `/api`
 
 ## Frontend
 
+### Theme
+
+The app uses a **dark theme** with Purina red (`#c41230`) accents. PrimeVue's Aura preset is configured with a red primary palette and dark mode enabled via a `.dark-mode` CSS class on the root `<html>` element. All custom styles use CSS custom properties defined in `style.css` for consistent dark surfaces, borders, and text colors.
+
 ### Views
 
-| Route     | View              | Description                                      |
-|-----------|-------------------|--------------------------------------------------|
-| `/login`  | LoginView         | PIN entry form                                   |
-| `/`       | DashboardView     | Main inventory table with quick +/- adjustments  |
-| `/prices` | PricesView        | Pricing table with editable markups + CSV import  |
-| `/log`    | LogView           | Searchable inventory change history               |
+| Route      | View              | Description                                           |
+|------------|-------------------|-------------------------------------------------------|
+| `/login`   | LoginView         | PIN entry form                                        |
+| `/`        | DashboardView     | Main inventory table with search and quick +/- adjust |
+| `/invoice` | InvoiceView       | Invoice builder with PDF export and inventory pull     |
+| `/prices`  | PricesView        | Dealer price list viewer + CSV import                  |
+| `/log`     | LogView           | Searchable inventory change history                    |
 
 ### Dashboard (DashboardView)
 
-The main working view. Shows a curated list of ~36 main products sorted in a hand-picked display order. Features:
+The main working view. Shows a curated list of ~36 main products organized into groups. Features:
 
-- **Search/filter** products by name
-- **Quick adjust** buttons (+/-) for fast sales tracking
-- **Adjust dialog** for specific adjustment type, quantity, and notes
-- **Bulk restock** dialog for entering quantities for multiple products at once
+- **Search/filter bar** with multi-term matching (e.g., "safe 50" matches "SafeChoice Perform 50LB")
+- **Quick adjust** buttons (+/-) on each row for fast sales/restock tracking
+- **Product groups** separated by visual dividers, groups with no search matches are hidden
 - **Visual indicators**:
-  - Red row: product is out of stock (qty = 0)
-  - Orange quantity text: product is at or below reorder point
+  - Dark red row: product is out of stock (qty = 0)
+  - Dark amber row: product is at or below reorder point
+
+### Invoice (InvoiceView)
+
+A card-based invoice builder for creating customer invoices. Features:
+
+- **Customer name** and **date** fields
+- **Line item cards** that auto-expand as products are added (card-based layout, not a table)
+- **Product selector** dropdown with search/filter
+- **Qty stepper** buttons (+/-) on each line item
+- **Auto-calculated** unit price, extended price, and invoice total
+- **Download PDF** button generates a professional invoice PDF (jsPDF + autoTable)
+- **Pull Inventory** button deducts all line item quantities from inventory via bulk adjust, logging each as a sale
+- **Paid** checkbox for tracking payment status
+- **Clear** button resets the entire invoice
 
 ### Prices (PricesView)
 
-Shows all products with pricing details. Features:
+Shows the full Purina dealer price list archive from the Google Sheet. Features:
 
-- Editable markup percentage per product (changes recalculate prices live)
-- Columns: Product Name, Weight, Purina Cost, Markup %, Pre-Tax Price, With-Tax Price, Pallet Cost
-- **CSV Import**: Upload a new Purina monthly price list CSV to bulk-update costs
+- Searchable/filterable DataTable across all columns
+- **CSV Import**: Upload a new Purina monthly price list CSV to refresh costs
 
 ### Log (LogView)
 
@@ -506,15 +523,18 @@ Purina-Tracker/
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
-│   │   ├── main.ts              # Vue app entry point
+│   │   ├── main.ts              # Vue app entry point (PrimeVue dark theme config)
 │   │   ├── App.vue              # Root component
-│   │   ├── style.css            # Global styles
+│   │   ├── style.css            # Global dark theme styles & CSS variables
 │   │   ├── components/
 │   │   │   └── AppLayout.vue    # Nav bar + content wrapper
+│   │   ├── config/
+│   │   │   └── products.ts      # Product display groups & ordering
 │   │   ├── views/
 │   │   │   ├── LoginView.vue    # PIN login
-│   │   │   ├── DashboardView.vue# Inventory management
-│   │   │   ├── PricesView.vue   # Pricing & CSV import
+│   │   │   ├── DashboardView.vue# Inventory management with search
+│   │   │   ├── InvoiceView.vue  # Invoice builder with PDF & inventory pull
+│   │   │   ├── PricesView.vue   # Dealer price list & CSV import
 │   │   │   └── LogView.vue      # Change history
 │   │   ├── stores/
 │   │   │   ├── auth.ts          # Auth state
