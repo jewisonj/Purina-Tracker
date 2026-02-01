@@ -4,6 +4,7 @@ import { useInventoryStore } from '../stores/inventory'
 import { useToast } from 'primevue/usetoast'
 import AppLayout from '../components/AppLayout.vue'
 import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
 import type { Product } from '../types'
 import { PRODUCT_GROUPS, type ProductConfig } from '../config/products'
 
@@ -34,18 +35,29 @@ interface DisplayGroup {
   rows: DisplayRow[]
 }
 
+const searchQuery = ref('')
+
 const displayGroups = computed<DisplayGroup[]>(() => {
+  const q = searchQuery.value.toLowerCase().trim()
+  const terms = q ? q.split(/\s+/) : []
+
   return PRODUCT_GROUPS.map(group => ({
-    rows: group.products.map(cfg => {
-      const product = productMap.value.get(cfg.materialNo) || null
-      return {
-        config: cfg,
-        product,
-        price: product ? product.retail_with_tax : cfg.defaultPrice,
-        qty: product ? product.qty_on_hand : null,
-      }
-    }),
-  }))
+    rows: group.products
+      .map(cfg => {
+        const product = productMap.value.get(cfg.materialNo) || null
+        return {
+          config: cfg,
+          product,
+          price: product ? product.retail_with_tax : cfg.defaultPrice,
+          qty: product ? product.qty_on_hand : null,
+        }
+      })
+      .filter(row => {
+        if (!terms.length) return true
+        const name = row.config.displayName.toLowerCase()
+        return terms.every(t => name.includes(t))
+      }),
+  })).filter(group => group.rows.length > 0)
 })
 
 async function quickAdjust(row: DisplayRow, delta: number) {
@@ -80,6 +92,15 @@ async function quickAdjust(row: DisplayRow, delta: number) {
           size="small"
           @click="store.fetchProducts()"
           :loading="store.loading"
+        />
+      </div>
+
+      <div class="search-bar">
+        <i class="pi pi-search search-icon"></i>
+        <InputText
+          v-model="searchQuery"
+          placeholder="Filter products..."
+          class="search-input"
         />
       </div>
 
@@ -137,6 +158,27 @@ async function quickAdjust(row: DisplayRow, delta: number) {
   margin: 0;
   font-size: 20px;
   color: var(--text);
+}
+
+.search-bar {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding-left: 32px !important;
+  font-size: 14px;
 }
 
 .inv-table {

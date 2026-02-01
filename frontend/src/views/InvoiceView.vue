@@ -5,10 +5,10 @@ import { useToast } from 'primevue/usetoast'
 import AppLayout from '../components/AppLayout.vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
-import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import { ALL_DISPLAY_PRODUCTS, type ProductConfig } from '../config/products'
 import type { Product } from '../types'
+import { bulkAdjust } from '../services/api'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -79,6 +79,7 @@ function clearInvoice() {
   customerName.value = ''
   invoiceDate.value = new Date().toISOString().split('T')[0]
   lineItems.value = [{ selectedConfig: null, qty: 1 }]
+  paid.value = false
 }
 
 function downloadPDF() {
@@ -174,6 +175,41 @@ function downloadPDF() {
 
   toast.add({ severity: 'success', summary: 'PDF Downloaded', detail: 'Invoice saved.', life: 2000 })
 }
+
+const paid = ref(false)
+const pullingInventory = ref(false)
+
+async function pullInventory() {
+  const validItems = lineItems.value.filter(item => item.selectedConfig && item.qty > 0)
+  if (!validItems.length) {
+    toast.add({ severity: 'warn', summary: 'No items', detail: 'Add at least one product to pull from inventory.', life: 3000 })
+    return
+  }
+
+  pullingInventory.value = true
+  try {
+    const adjustments = validItems.map(item => ({
+      material_no: item.selectedConfig!.materialNo,
+      change_type: 'sale' as const,
+      quantity: -item.qty,
+      notes: `Invoice: ${customerName.value.trim() || 'unnamed'}`,
+    }))
+
+    await bulkAdjust(adjustments)
+    await store.fetchProducts()
+
+    toast.add({
+      severity: 'success',
+      summary: 'Inventory Updated',
+      detail: `${validItems.length} product(s) pulled from inventory.`,
+      life: 3000,
+    })
+  } catch (err: any) {
+    toast.add({ severity: 'error', summary: 'Error', detail: err.message || 'Failed to pull inventory.', life: 4000 })
+  } finally {
+    pullingInventory.value = false
+  }
+}
 </script>
 
 <template>
@@ -181,10 +217,9 @@ function downloadPDF() {
     <div class="invoice-page">
       <div class="page-header">
         <h1>Invoice</h1>
-        <div class="header-actions">
-          <Button label="Clear" icon="pi pi-trash" severity="secondary" text size="small" @click="clearInvoice" />
-          <Button label="Download PDF" icon="pi pi-download" severity="danger" size="small" @click="downloadPDF" />
-        </div>
+        <Button label="Clear" icon="pi pi-trash" severity="secondary" text size="small" @click="clearInvoice" />
+        <span class="header-spacer"></span>
+        <Button label="Download PDF" icon="pi pi-download" severity="danger" size="small" @click="downloadPDF" />
       </div>
 
       <!-- Customer Info -->
@@ -200,64 +235,76 @@ function downloadPDF() {
       </div>
 
       <!-- Line Items -->
-      <table class="line-items-table">
-        <thead>
-          <tr>
-            <th class="col-product">Product</th>
-            <th class="col-qty">Qty</th>
-            <th class="col-price">Unit Price</th>
-            <th class="col-ext">Extended</th>
-            <th class="col-action"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(item, idx) in lineItems" :key="idx">
-            <td class="col-product">
-              <Select
-                v-model="item.selectedConfig"
-                :options="productOptions"
-                optionLabel="label"
-                optionValue="value"
-                placeholder="Select product..."
-                filter
-                style="width: 100%;"
-              />
-            </td>
-            <td class="col-qty">
-              <InputNumber
-                v-model="item.qty"
-                :min="1"
-                :max="999"
-                style="width: 70px;"
-                inputStyle="text-align: center;"
-              />
-            </td>
-            <td class="col-price">
-              <span v-if="item.selectedConfig">${{ getPrice(item.selectedConfig).toFixed(2) }}</span>
-            </td>
-            <td class="col-ext">
-              <strong v-if="item.selectedConfig && item.qty">${{ getExtended(item).toFixed(2) }}</strong>
-            </td>
-            <td class="col-action">
-              <Button
-                v-if="lineItems.length > 1 && idx < lineItems.length - 1"
-                icon="pi pi-times"
-                severity="secondary"
-                text
-                size="small"
-                @click="removeRow(idx)"
-              />
-            </td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr class="total-row">
-            <td colspan="3" style="text-align: right; font-weight: 700; font-size: 15px;">Total:</td>
-            <td class="col-ext" style="font-weight: 700; font-size: 15px;">${{ invoiceTotal.toFixed(2) }}</td>
-            <td></td>
-          </tr>
-        </tfoot>
-      </table>
+      <div class="line-items">
+        <div
+          v-for="(item, idx) in lineItems"
+          :key="idx"
+          class="line-card"
+          :class="{ 'line-card--empty': !item.selectedConfig }"
+        >
+          <!-- Row 1: Product selector full width -->
+          <div class="line-product-row">
+            <Select
+              v-model="item.selectedConfig"
+              :options="productOptions"
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Select product..."
+              filter
+              class="product-select"
+            />
+            <button
+              v-if="lineItems.length > 1 && idx < lineItems.length - 1"
+              class="remove-btn"
+              @click="removeRow(idx)"
+            >
+              <i class="pi pi-times"></i>
+            </button>
+          </div>
+
+          <!-- Row 2: Qty / Unit Price / Extended -->
+          <div v-if="item.selectedConfig" class="line-details-row">
+            <div class="detail-cell">
+              <span class="detail-label">Qty</span>
+              <div class="qty-stepper">
+                <button class="qty-btn" @click="item.qty = Math.max(1, item.qty - 1)">−</button>
+                <span class="qty-value">{{ item.qty }}</span>
+                <button class="qty-btn" @click="item.qty = Math.min(999, item.qty + 1)">+</button>
+              </div>
+            </div>
+            <div class="detail-cell">
+              <span class="detail-label">Unit Price</span>
+              <span class="detail-value">${{ getPrice(item.selectedConfig).toFixed(2) }}</span>
+            </div>
+            <div class="detail-cell">
+              <span class="detail-label">Extended</span>
+              <strong class="detail-value">${{ getExtended(item).toFixed(2) }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Total -->
+      <div class="invoice-total">
+        <span>Total:</span>
+        <strong>${{ invoiceTotal.toFixed(2) }}</strong>
+      </div>
+
+      <!-- Footer: Paid + Pull Inventory -->
+      <div class="invoice-footer">
+        <label class="paid-check">
+          <input type="checkbox" v-model="paid" />
+          <span>Paid</span>
+        </label>
+        <Button
+          label="Pull Inventory"
+          icon="pi pi-box"
+          severity="warn"
+          size="small"
+          :loading="pullingInventory"
+          @click="pullInventory"
+        />
+      </div>
     </div>
   </AppLayout>
 </template>
@@ -273,6 +320,8 @@ function downloadPDF() {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .page-header h1 {
@@ -281,9 +330,8 @@ function downloadPDF() {
   color: var(--text);
 }
 
-.header-actions {
-  display: flex;
-  gap: 8px;
+.header-spacer {
+  flex: 1;
 }
 
 .customer-row {
@@ -311,73 +359,187 @@ function downloadPDF() {
   text-transform: uppercase;
 }
 
-.line-items-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
+/* --- Line item cards --- */
+.line-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.line-card {
   background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.line-card--empty {
+  border-style: dashed;
+}
+
+.line-product-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.product-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.remove-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.remove-btn:hover {
+  color: var(--primary);
+  background: var(--surface-hover, rgba(255,255,255,0.05));
+}
+
+.line-details-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.detail-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+}
+
+.detail-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.detail-value {
+  font-size: 15px;
+  color: var(--text);
+}
+
+/* --- Qty stepper --- */
+.qty-stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
   overflow: hidden;
 }
 
-.line-items-table thead th {
+.qty-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--surface-hover, #333);
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+
+.qty-btn:active {
   background: var(--primary);
   color: #fff;
-  padding: 8px 10px;
-  text-align: left;
+}
+
+.qty-value {
+  width: 36px;
+  text-align: center;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 15px;
+  background: var(--surface);
 }
 
-.line-items-table tbody td {
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
-  color: var(--text);
-}
-
-.line-items-table th.col-qty,
-.line-items-table td.col-qty {
-  width: 80px;
-  text-align: center;
-}
-
-.line-items-table th.col-price,
-.line-items-table td.col-price {
-  width: 100px;
-  text-align: right;
-}
-
-.line-items-table th.col-ext,
-.line-items-table td.col-ext {
-  width: 100px;
-  text-align: right;
-}
-
-.line-items-table th.col-action,
-.line-items-table td.col-action {
-  width: 40px;
-  text-align: center;
-}
-
-.total-row td {
+/* --- Total bar --- */
+.invoice-total {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: var(--surface);
   border-top: 2px solid var(--primary);
-  padding: 10px;
+  border-radius: 0 0 8px 8px;
+  font-size: 16px;
   color: var(--text);
+}
+
+.invoice-total strong {
+  font-size: 18px;
+}
+
+/* --- Footer --- */
+.invoice-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.paid-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  user-select: none;
+}
+
+.paid-check input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--primary);
+  cursor: pointer;
 }
 
 @media (max-width: 600px) {
+  .page-header h1 {
+    width: 100%;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
   .customer-row {
     flex-direction: column;
   }
 
-  .line-items-table {
-    font-size: 13px;
+  .line-details-row {
+    gap: 8px;
   }
 
-  .line-items-table thead th,
-  .line-items-table tbody td {
-    padding: 4px 6px;
+  .detail-value {
+    font-size: 14px;
+  }
+
+  .qty-btn {
+    width: 36px;
+    height: 36px;
   }
 }
 </style>
