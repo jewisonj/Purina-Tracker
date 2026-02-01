@@ -102,6 +102,11 @@ async function quickAdjust(row: DisplayRow, delta: number) {
           placeholder="Filter products..."
           class="search-input"
         />
+        <i
+          v-if="searchQuery"
+          class="pi pi-times clear-icon"
+          @click="searchQuery = ''"
+        ></i>
       </div>
 
       <table class="inv-table">
@@ -178,7 +183,22 @@ async function quickAdjust(row: DisplayRow, delta: number) {
 .search-input {
   width: 100%;
   padding-left: 32px !important;
+  padding-right: 32px !important;
   font-size: 14px;
+}
+
+.clear-icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.clear-icon:hover {
+  color: var(--text);
 }
 
 .inv-table {
