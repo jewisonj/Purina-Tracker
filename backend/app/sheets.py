@@ -325,7 +325,7 @@ class SheetsService:
         return build("drive", "v3", credentials=creds, cache_discovery=False)
 
     def upload_to_drive(self, file_bytes: bytes, filename: str, mime_type: str = "application/pdf") -> str:
-        """Upload a file to Google Drive and return its web view URL."""
+        """Upload a file to a Shared Drive folder and return its web view URL."""
         folder_id = self._settings.google_drive_folder_id
         if not folder_id:
             raise RuntimeError("GOOGLE_DRIVE_FOLDER_ID not set")
@@ -337,7 +337,10 @@ class SheetsService:
         media = MediaIoBaseUpload(io.BytesIO(file_bytes), mimetype=mime_type, resumable=False)
 
         uploaded = drive.files().create(
-            body=file_metadata, media_body=media, fields="id, webViewLink, webContentLink"
+            body=file_metadata,
+            media_body=media,
+            fields="id, webViewLink, webContentLink",
+            supportsAllDrives=True,
         ).execute()
 
         file_id = uploaded.get("id", "")
