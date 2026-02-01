@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+backend/venv/
+.env
+
+# Node
+node_modules/
+frontend/node_modules/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Scripts (not needed in container)
+seed.py
+update_prices.py
+add_products.py
+SETUP.md
+*.csv

@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /s \"J:\\\\Purina-Tracker\")",
+      "Bash(pdftotext:*)",
+      "WebFetch(domain:docs.google.com)",
+      "WebFetch(domain:doc-10-8k-sheets.googleusercontent.com)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(git init:*)",
+      "Bash(J:\\\\Purina-Tracker\\\\backend\\\\venv\\\\Scripts\\\\python.exe:*)",
+      "Bash(\"J:/Purina-Tracker/backend/venv/Scripts/python.exe\":*)",
+      "Bash(\"J:/Purina-Tracker/backend/venv/Scripts/python.exe\" -c:*)",
+      "Bash(fly version:*)",
+      "Bash(fly apps:*)",
+      "Bash(\"C:/Users/Jack Jewison/.fly/bin/flyctl\" apps list)",
+      "Bash(\"C:/Users/Jack Jewison/.fly/bin/flyctl\" apps create purina-tracker --org personal)",
+      "Bash(\"C:/Users/Jack Jewison/.fly/bin/flyctl\" secrets set APP_PIN=1234 --app purina-tracker)",
+      "Bash(\"C:/Users/Jack Jewison/.fly/bin/flyctl\" secrets set GOOGLE_SHEET_ID=1fTIf-pbn0zeihe6PSGaeD_EhSOo3S7JMJK-OxYkLrjE --app purina-tracker)",
+      "Bash(\"C:/Users/Jack Jewison/.fly/bin/flyctl\" deploy --app purina-tracker --config \"J:/Purina-Tracker/fly.toml\" --dockerfile \"J:/Purina-Tracker/Dockerfile\" --local-only \"J:/Purina-Tracker\")",
+      "WebFetch(domain:purina-tracker.fly.dev)",
+      "Bash(\"C:/Users/Jack Jewison/.fly/bin/flyctl\" deploy)",
+      "Bash(git remote add:*)",
+      "mcp__MCP_DOCKER__get_file_contents",
+      "Bash(git add:*)",
+      "Bash(git rm:*)",
+      "Bash(python:*)",
+      "Bash(git reset:*)"
+    ]
+  }
+}
