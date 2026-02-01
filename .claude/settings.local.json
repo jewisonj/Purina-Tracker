@@ -48,7 +48,12 @@
       "mcp__MCP_DOCKER__browser_navigate",
       "mcp__MCP_DOCKER__browser_type",
       "mcp__MCP_DOCKER__browser_take_screenshot",
-      "mcp__MCP_DOCKER__browser_close"
+      "mcp__MCP_DOCKER__browser_close",
+      "Bash(\"C:\\\\Users\\\\Jack Jewison\\\\.fly\\\\bin\\\\fly.cmd\" version)",
+      "Bash(cmd /c \"\"\"C:\\\\Users\\\\Jack Jewison\\\\.fly\\\\bin\\\\fly.cmd\"\" version\")",
+      "Bash(cmd /c \"\"\"C:\\\\Users\\\\Jack Jewison\\\\.fly\\\\bin\\\\fly.cmd\"\" version 2>&1\")",
+      "Bash(cmd /c \"flyctl version\")",
+      "Bash(flyctl version:*)"
     ]
   }
 }
