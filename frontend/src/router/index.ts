@@ -20,7 +20,7 @@ const router = createRouter({
       path: '/invoice',
       name: 'invoice',
       component: () => import('../views/InvoiceView.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, adminOnly: true },
     },
   ],
 })
@@ -31,6 +31,10 @@ router.beforeEach(async (to) => {
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
+  }
+
+  if (to.meta.adminOnly && !authStore.isAdmin) {
+    return { name: 'dashboard' }
   }
 
   if (to.name === 'login' && authStore.isAuthenticated) {

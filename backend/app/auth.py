@@ -10,19 +10,24 @@ from .config import get_settings
 security = HTTPBearer()
 
 
-def create_token(pin: str) -> str:
-    """Verify PIN and create a JWT token."""
+def create_token(pin: str) -> tuple[str, str]:
+    """Verify PIN and create a JWT token. Returns (token, role)."""
     settings = get_settings()
 
-    if pin != settings.app_pin:
+    if pin == settings.admin_pin:
+        role = "admin"
+    elif pin == settings.viewer_pin:
+        role = "viewer"
+    else:
         raise HTTPException(status_code=401, detail="Invalid PIN")
 
     payload = {
-        "sub": "user",
+        "sub": role,
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(days=settings.jwt_expiry_days),
     }
-    return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
+    token = jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
+    return token, role
 
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:

@@ -10,8 +10,8 @@ router = APIRouter(tags=["auth"])
 
 @router.post("/auth/login", response_model=LoginResponse)
 async def login(body: LoginRequest):
-    token = create_token(body.pin)
-    return LoginResponse(token=token)
+    token, role = create_token(body.pin)
+    return LoginResponse(token=token, role=role)
 
 
 @router.get("/auth/verify")

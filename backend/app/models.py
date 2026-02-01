@@ -10,6 +10,7 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     token: str
+    role: str
     expires_in_days: int = 7
 
 

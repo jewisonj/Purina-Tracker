@@ -37,30 +37,37 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 // Auth
 export async function login(pin: string): Promise<string> {
-  const data = await request<{ token: string }>('/auth/login', {
+  const data = await request<{ token: string; role: string }>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ pin }),
   })
   localStorage.setItem('auth_token', data.token)
-  return data.token
+  localStorage.setItem('auth_role', data.role)
+  return data.role
 }
 
-export async function verifyAuth(): Promise<boolean> {
+export async function verifyAuth(): Promise<string | null> {
   try {
-    await request('/auth/verify')
-    return true
+    const data = await request<{ status: string; user: string }>('/auth/verify')
+    localStorage.setItem('auth_role', data.user)
+    return data.user
   } catch {
-    return false
+    return null
   }
 }
 
 export function logout() {
   localStorage.removeItem('auth_token')
+  localStorage.removeItem('auth_role')
   window.location.href = '/login'
 }
 
 export function isLoggedIn(): boolean {
   return !!getToken()
+}
+
+export function getRole(): string {
+  return localStorage.getItem('auth_role') || ''
 }
 
 // Products

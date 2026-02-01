@@ -20,8 +20,8 @@ async function handleLogin() {
   error.value = ''
 
   try {
-    await login(pin.value)
-    authStore.setAuthenticated(true)
+    const role = await login(pin.value)
+    authStore.setAuthenticated(true, role)
     const redirect = (route.query.redirect as string) || '/'
     router.push(redirect)
   } catch (e: any) {
@@ -64,6 +64,8 @@ async function handleLogin() {
           severity="danger"
         />
       </form>
+
+      <p class="viewer-hint">To see available inventory use pin <strong>1234</strong></p>
     </div>
   </div>
 </template>
@@ -112,5 +114,22 @@ async function handleLogin() {
   font-size: 13px;
   text-align: center;
   margin-bottom: 12px;
+}
+
+.viewer-hint {
+  margin-top: 24px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.4;
+  padding: 10px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--surface-alt);
+}
+
+.viewer-hint strong {
+  color: var(--text);
+  letter-spacing: 2px;
 }
 </style>

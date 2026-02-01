@@ -12,7 +12,8 @@ class Settings(BaseSettings):
     google_credentials_json: str = ""  # JSON string of service account creds
 
     # Auth
-    app_pin: str = "1234"  # Override via fly secret
+    admin_pin: str = "1423"  # Override via fly secret
+    viewer_pin: str = "1234"  # Read-only inventory access
     jwt_secret: str = "change-me-in-production"  # Override via fly secret
     jwt_expiry_days: int = 7
 

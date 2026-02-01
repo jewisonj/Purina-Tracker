@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useInventoryStore } from '../stores/inventory'
+import { useAuthStore } from '../stores/auth'
 import { useToast } from 'primevue/usetoast'
 import AppLayout from '../components/AppLayout.vue'
 import Button from 'primevue/button'
@@ -9,6 +10,7 @@ import type { Product } from '../types'
 import { PRODUCT_GROUPS, type ProductConfig } from '../config/products'
 
 const store = useInventoryStore()
+const authStore = useAuthStore()
 const toast = useToast()
 
 onMounted(() => {
@@ -131,11 +133,12 @@ async function quickAdjust(row: DisplayRow, delta: number) {
               <td class="col-product">{{ row.config.displayName }}</td>
               <td class="col-price">${{ row.price.toFixed(2) }}</td>
               <td class="col-qty">
-                <div class="qty-cell" v-if="row.product">
+                <div class="qty-cell" v-if="row.product && authStore.isAdmin">
                   <button class="qty-btn minus" @click="quickAdjust(row, -1)" title="Sell 1">&minus;</button>
                   <span class="qty-value">{{ row.qty }}</span>
                   <button class="qty-btn plus" @click="quickAdjust(row, 1)" title="Add 1">+</button>
                 </div>
+                <span v-else-if="row.product" class="qty-value">{{ row.qty }}</span>
                 <span v-else class="qty-na">&mdash;</span>
               </td>
             </tr>
