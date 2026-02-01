@@ -37,7 +37,11 @@
       "Bash(git config:*)",
       "Bash(npm run build:*)",
       "Bash(npx vite build)",
-      "Bash(npx vue-tsc:*)"
+      "Bash(npx vue-tsc:*)",
+      "Bash(curl:*)",
+      "Bash(where:*)",
+      "Bash(netstat:*)",
+      "Bash(timeout /t 4 /nobreak)"
     ]
   }
 }
