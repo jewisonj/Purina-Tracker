@@ -1,5 +1,6 @@
 """Google Sheets service with caching."""
 
+import io
 import json
 import time
 import math
@@ -7,6 +8,9 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import gspread
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+from google.oauth2.service_account import Credentials as SACredentials
 
 from .config import get_settings
 from .models import Product, LogEntry
@@ -32,6 +36,9 @@ COL = {
 TAB_INVENTORY = "Inventory"
 TAB_LOG = "Inventory Log"
 TAB_ARCHIVE = "Price List Archive"
+TAB_INVOICES = "Invoices"
+
+DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
 
 def ceil_quarter(value: float) -> float:
@@ -279,6 +286,79 @@ class SheetsService:
         """Get products at or below reorder point."""
         products = self.get_all_products()
         return [p for p in products if p.qty_on_hand <= p.reorder_point]
+
+    # ── Invoice filing ──────────────────────────────────────────────
+
+    def _get_or_create_invoices_tab(self) -> gspread.Worksheet:
+        """Get the Invoices tab, creating it with headers if it doesn't exist."""
+        ss = self._get_spreadsheet()
+        try:
+            return ss.worksheet(TAB_INVOICES)
+        except gspread.WorksheetNotFound:
+            ws = ss.add_worksheet(title=TAB_INVOICES, rows=1000, cols=8)
+            ws.append_row(
+                ["Invoice #", "Date", "Customer", "Items Summary", "Total", "Paid", "Filed At", "Drive URL"],
+                value_input_option="USER_ENTERED",
+            )
+            return ws
+
+    def _next_invoice_number(self, ws: gspread.Worksheet) -> str:
+        """Generate the next invoice number like INV-0001."""
+        rows = ws.get_all_values()
+        # rows[0] is header, data rows start at index 1
+        count = len(rows) - 1 if len(rows) > 1 else 0
+        return f"INV-{count + 1:04d}"
+
+    def _build_drive_service(self):
+        """Build a Google Drive API service using the same service account."""
+        creds_json = self._settings.google_credentials_json
+        if not creds_json:
+            raise RuntimeError("GOOGLE_CREDENTIALS_JSON not set")
+        creds_info = json.loads(creds_json)
+        creds = SACredentials.from_service_account_info(creds_info, scopes=DRIVE_SCOPES)
+        return build("drive", "v3", credentials=creds, cache_discovery=False)
+
+    def upload_to_drive(self, file_bytes: bytes, filename: str, mime_type: str = "application/pdf") -> str:
+        """Upload a file to Google Drive and return its web view URL."""
+        folder_id = self._settings.google_drive_folder_id
+        if not folder_id:
+            raise RuntimeError("GOOGLE_DRIVE_FOLDER_ID not set")
+
+        drive = self._build_drive_service()
+        file_metadata = {"name": filename, "parents": [folder_id]}
+        media = MediaIoBaseUpload(io.BytesIO(file_bytes), mimetype=mime_type, resumable=False)
+
+        uploaded = drive.files().create(
+            body=file_metadata, media_body=media, fields="id, webViewLink"
+        ).execute()
+
+        return uploaded.get("webViewLink", "")
+
+    def file_invoice(
+        self,
+        customer_name: str,
+        invoice_date: str,
+        items_summary: str,
+        total: float,
+        paid: bool,
+        pdf_bytes: bytes | None = None,
+    ) -> dict:
+        """Log an invoice to the Invoices sheet and optionally upload PDF to Drive."""
+        ws = self._get_or_create_invoices_tab()
+        inv_num = self._next_invoice_number(ws)
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+        drive_url = ""
+        if pdf_bytes and self._settings.google_drive_folder_id:
+            filename = f"{inv_num}_{customer_name.replace(' ', '_')}_{invoice_date.replace('-', '')}.pdf"
+            drive_url = self.upload_to_drive(pdf_bytes, filename)
+
+        ws.append_row(
+            [inv_num, invoice_date, customer_name, items_summary, f"${total:.2f}", "Yes" if paid else "No", now, drive_url],
+            value_input_option="USER_ENTERED",
+        )
+
+        return {"invoice_number": inv_num, "drive_url": drive_url}
 
 
 # Singleton instance

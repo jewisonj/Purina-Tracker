@@ -8,7 +8,7 @@ import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import { ALL_DISPLAY_PRODUCTS, type ProductConfig } from '../config/products'
 import type { Product } from '../types'
-import { bulkAdjust } from '../services/api'
+import { bulkAdjust, fileInvoice } from '../services/api'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -82,17 +82,22 @@ function clearInvoice() {
   paid.value = false
 }
 
-function downloadPDF() {
+/** Validate invoice has items and customer name. Returns valid items or null. */
+function validateInvoice(): LineItem[] | null {
   const validItems = lineItems.value.filter(item => item.selectedConfig && item.qty > 0)
   if (!validItems.length) {
     toast.add({ severity: 'warn', summary: 'No items', detail: 'Add at least one product to the invoice.', life: 3000 })
-    return
+    return null
   }
   if (!customerName.value.trim()) {
     toast.add({ severity: 'warn', summary: 'Missing customer', detail: 'Enter a customer name.', life: 3000 })
-    return
+    return null
   }
+  return validItems
+}
 
+/** Generate a jsPDF document from the current invoice data. */
+function generatePDFDoc(validItems: LineItem[]): jsPDF {
   const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.getWidth()
 
@@ -168,12 +173,58 @@ function downloadPDF() {
   doc.setFont('helvetica', 'italic')
   doc.text('Thank you for your business!', pageWidth / 2, finalY + 12, { align: 'center' })
 
-  // Download
+  return doc
+}
+
+function downloadPDF() {
+  const validItems = validateInvoice()
+  if (!validItems) return
+
+  const doc = generatePDFDoc(validItems)
   const datePart = invoiceDate.value.replace(/-/g, '')
   const namePart = customerName.value.trim().replace(/\s+/g, '_').substring(0, 20)
   doc.save(`Invoice_${namePart}_${datePart}.pdf`)
 
   toast.add({ severity: 'success', summary: 'PDF Downloaded', detail: 'Invoice saved.', life: 2000 })
+}
+
+const filingInvoice = ref(false)
+
+async function fileInvoiceHandler() {
+  const validItems = validateInvoice()
+  if (!validItems) return
+
+  filingInvoice.value = true
+  try {
+    const doc = generatePDFDoc(validItems)
+    const pdfBlob = doc.output('blob')
+
+    const invoiceData = {
+      customer_name: customerName.value.trim(),
+      invoice_date: invoiceDate.value,
+      items: validItems.map(item => ({
+        product_name: item.selectedConfig!.displayName,
+        material_no: item.selectedConfig!.materialNo,
+        qty: item.qty,
+        unit_price: getPrice(item.selectedConfig!),
+        extended: getExtended(item),
+      })),
+      total: invoiceTotal.value,
+      paid: paid.value,
+    }
+
+    const result = await fileInvoice(invoiceData, pdfBlob)
+
+    let detail = `${result.invoice_number} filed.`
+    if (result.drive_url) {
+      detail += ' PDF uploaded to Drive.'
+    }
+    toast.add({ severity: 'success', summary: 'Invoice Filed', detail, life: 4000 })
+  } catch (err: any) {
+    toast.add({ severity: 'error', summary: 'Filing Failed', detail: err.message || 'Could not file invoice.', life: 4000 })
+  } finally {
+    filingInvoice.value = false
+  }
 }
 
 const paid = ref(false)
@@ -220,6 +271,7 @@ async function pullInventory() {
         <Button label="Clear" icon="pi pi-trash" severity="secondary" text size="small" @click="clearInvoice" />
         <span class="header-spacer"></span>
         <Button label="Download PDF" icon="pi pi-download" severity="danger" size="small" @click="downloadPDF" />
+        <Button label="File Invoice" icon="pi pi-folder" severity="info" size="small" :loading="filingInvoice" @click="fileInvoiceHandler" />
       </div>
 
       <!-- Customer Info -->

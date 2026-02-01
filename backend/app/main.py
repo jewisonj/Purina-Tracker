@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from .config import get_settings
-from .routes import auth_router, products_router, inventory_router, pricelist_router
+from .routes import auth_router, products_router, inventory_router, pricelist_router, invoices_router
 
 settings = get_settings()
 
@@ -32,6 +32,7 @@ app.include_router(auth_router, prefix="/api")
 app.include_router(products_router, prefix="/api")
 app.include_router(inventory_router, prefix="/api")
 app.include_router(pricelist_router, prefix="/api")
+app.include_router(invoices_router, prefix="/api")
 
 
 @app.get("/health")

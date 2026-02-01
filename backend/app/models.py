@@ -61,3 +61,25 @@ class LogEntry(BaseModel):
     new_qty: int
     changed_by: str
     notes: str
+
+
+class InvoiceItem(BaseModel):
+    product_name: str
+    material_no: str
+    qty: int
+    unit_price: float
+    extended: float
+
+
+class FileInvoiceRequest(BaseModel):
+    customer_name: str
+    invoice_date: str
+    items: list[InvoiceItem]
+    total: float
+    paid: bool = False
+
+
+class FileInvoiceResponse(BaseModel):
+    message: str
+    drive_url: str = ""
+    invoice_number: str = ""

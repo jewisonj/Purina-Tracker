@@ -117,6 +117,33 @@ export async function getPriceListArchive(): Promise<{ headers: string[]; rows: 
   return request<{ headers: string[]; rows: string[][] }>('/pricelist/archive')
 }
 
+// Invoice filing
+export async function fileInvoice(invoiceData: object, pdfBlob: Blob): Promise<{ message: string; drive_url: string; invoice_number: string }> {
+  const token = getToken()
+  const formData = new FormData()
+  formData.append('invoice_data', JSON.stringify(invoiceData))
+  formData.append('pdf', pdfBlob, 'invoice.pdf')
+
+  const res = await fetch(`${API_BASE}/invoices/file`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  })
+
+  if (res.status === 401) {
+    localStorage.removeItem('auth_token')
+    window.location.href = '/login'
+    throw new Error('Unauthorized')
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.detail || `Filing failed: ${res.status}`)
+  }
+
+  return res.json()
+}
+
 // Price list import
 export async function importPriceList(file: File): Promise<{ updated: number; new_products: string[]; message: string }> {
   const token = getToken()

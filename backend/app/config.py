@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     ]
     cors_allow_all: bool = False
 
+    # Google Drive (for filing invoices)
+    google_drive_folder_id: str = ""
+
     # Cache
     cache_ttl_seconds: int = 30
 
