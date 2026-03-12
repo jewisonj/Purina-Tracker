@@ -34,3 +34,14 @@ export interface InventoryAdjustment {
   quantity: number
   notes?: string
 }
+
+export interface Invoice {
+  invoice_number: string
+  date: string
+  customer: string
+  items_summary: string
+  total: string
+  paid: boolean
+  filed_at: string
+  drive_url: string
+}

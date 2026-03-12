@@ -10,8 +10,14 @@ from typing import Optional
 
 import gspread
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
+from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 from google.oauth2.service_account import Credentials as SACredentials
+
+# PDF manipulation imports
+from pypdf import PdfReader, PdfWriter
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.colors import Color
 
 from .config import get_settings
 from .models import Product, LogEntry
@@ -388,6 +394,169 @@ class SheetsService:
         )
 
         return {"invoice_number": inv_num, "drive_url": drive_url, "drive_error": drive_error}
+
+    def get_all_invoices(self, search_query: str = "") -> list[dict]:
+        """Get all invoices from the Invoices sheet."""
+        try:
+            ws = self._get_or_create_invoices_tab()
+        except gspread.WorksheetNotFound:
+            return []
+
+        rows = ws.get_all_values()
+        if len(rows) <= 1:  # Only header or empty
+            return []
+
+        # Header: Invoice #, Date, Customer, Items Summary, Total, Paid, Filed At, Drive URL
+        invoices = []
+        for row in rows[1:]:  # Skip header
+            if len(row) < 8:
+                continue  # Skip malformed rows
+
+            invoice = {
+                "invoice_number": row[0],
+                "date": row[1],
+                "customer": row[2],
+                "items_summary": row[3],
+                "total": row[4],
+                "paid": row[5].lower() in ("yes", "true", "1"),
+                "filed_at": row[6],
+                "drive_url": row[7] if len(row) > 7 else "",
+            }
+
+            # Apply search filter if provided
+            if search_query:
+                query_lower = search_query.lower()
+                if (query_lower not in invoice["customer"].lower() and
+                    query_lower not in invoice["invoice_number"].lower()):
+                    continue
+
+            invoices.append(invoice)
+
+        # Return most recent first
+        invoices.reverse()
+        return invoices
+
+    def update_invoice_status(self, invoice_number: str, paid: bool) -> dict:
+        """Update the paid status of an invoice. Returns result dict with drive_url for background watermarking."""
+        result = {"success": False, "drive_url": "", "error": ""}
+
+        try:
+            ws = self._get_or_create_invoices_tab()
+        except gspread.WorksheetNotFound:
+            result["error"] = "Invoices tab not found"
+            return result
+
+        rows = ws.get_all_values()
+        if len(rows) <= 1:
+            result["error"] = "No invoices found"
+            return result
+
+        # Find the invoice row (column A = Invoice #)
+        for idx, row in enumerate(rows[1:], start=2):  # Start at row 2 (1-indexed)
+            if len(row) > 0 and row[0] == invoice_number:
+                # Update column F (Paid) - column 6
+                ws.update_cell(idx, 6, "Yes" if paid else "No")
+                result["success"] = True
+
+                # Return drive_url so caller can queue watermark in background
+                if len(row) > 7 and row[7]:
+                    result["drive_url"] = row[7]
+
+                return result
+
+        result["error"] = f"Invoice {invoice_number} not found"
+        return result
+
+    def add_paid_watermark(self, drive_url: str) -> None:
+        """Public method to add PAID watermark to a PDF in Google Drive."""
+        self._add_paid_watermark_to_drive_pdf(drive_url)
+
+    def _create_paid_watermark(self, width: float, height: float) -> io.BytesIO:
+        """Create a PAID watermark PDF page."""
+        packet = io.BytesIO()
+        c = canvas.Canvas(packet, pagesize=(width, height))
+
+        # Semi-transparent red color for PAID stamp
+        c.setFillColor(Color(0.77, 0.07, 0.19, alpha=0.3))  # Purina red with transparency
+
+        # Rotate and position the watermark diagonally
+        c.saveState()
+        c.translate(width / 2, height / 2)
+        c.rotate(45)
+
+        # Draw PAID text
+        c.setFont("Helvetica-Bold", 72)
+        c.drawCentredString(0, 0, "PAID")
+
+        c.restoreState()
+        c.save()
+
+        packet.seek(0)
+        return packet
+
+    def _extract_file_id_from_url(self, drive_url: str) -> str:
+        """Extract Google Drive file ID from URL."""
+        # Handle various Google Drive URL formats
+        # https://drive.google.com/file/d/FILE_ID/view
+        # https://drive.google.com/open?id=FILE_ID
+        if "/d/" in drive_url:
+            parts = drive_url.split("/d/")
+            if len(parts) > 1:
+                return parts[1].split("/")[0]
+        elif "id=" in drive_url:
+            return drive_url.split("id=")[1].split("&")[0]
+        return ""
+
+    def _add_paid_watermark_to_drive_pdf(self, drive_url: str) -> None:
+        """Download PDF from Drive, add PAID watermark, and re-upload."""
+        file_id = self._extract_file_id_from_url(drive_url)
+        if not file_id:
+            raise ValueError(f"Could not extract file ID from URL: {drive_url}")
+
+        drive = self._build_drive_service()
+
+        # Download the PDF
+        request = drive.files().get_media(fileId=file_id)
+        pdf_buffer = io.BytesIO()
+        downloader = MediaIoBaseDownload(pdf_buffer, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+
+        pdf_buffer.seek(0)
+
+        # Read the PDF and add watermark to each page
+        reader = PdfReader(pdf_buffer)
+        writer = PdfWriter()
+
+        for page in reader.pages:
+            # Get page dimensions
+            width = float(page.mediabox.width)
+            height = float(page.mediabox.height)
+
+            # Create watermark for this page size
+            watermark_buffer = self._create_paid_watermark(width, height)
+            watermark_reader = PdfReader(watermark_buffer)
+            watermark_page = watermark_reader.pages[0]
+
+            # Merge watermark onto original page
+            page.merge_page(watermark_page)
+            writer.add_page(page)
+
+        # Write the watermarked PDF to buffer
+        output_buffer = io.BytesIO()
+        writer.write(output_buffer)
+        output_buffer.seek(0)
+
+        # Re-upload to Drive (update existing file)
+        media = MediaIoBaseUpload(output_buffer, mimetype="application/pdf", resumable=False)
+        drive.files().update(
+            fileId=file_id,
+            media_body=media,
+            supportsAllDrives=True,
+        ).execute()
+
+        logger.info(f"Added PAID watermark to PDF: {file_id}")
 
 
 # Singleton instance

@@ -3,11 +3,24 @@ import { ref, computed } from 'vue'
 import type { Product, LogEntry } from '../types'
 import * as api from '../services/api'
 
+// Type for embedded initial data
+interface InitialData {
+  products?: Product[]
+}
+
+// Check for embedded data from server
+declare global {
+  interface Window {
+    __INITIAL_DATA__?: InitialData
+  }
+}
+
 export const useInventoryStore = defineStore('inventory', () => {
   const products = ref<Product[]>([])
   const logEntries = ref<LogEntry[]>([])
   const loading = ref(false)
   const error = ref('')
+  const initialDataUsed = ref(false)
 
   const lowStockProducts = computed(() =>
     products.value.filter(p => p.qty_on_hand <= p.reorder_point)
@@ -16,7 +29,16 @@ export const useInventoryStore = defineStore('inventory', () => {
   const totalProducts = computed(() => products.value.length)
   const lowStockCount = computed(() => lowStockProducts.value.length)
 
-  async function fetchProducts() {
+  async function fetchProducts(forceRefresh = false) {
+    // Use embedded data if available and not forcing refresh
+    if (!forceRefresh && !initialDataUsed.value && window.__INITIAL_DATA__?.products) {
+      products.value = window.__INITIAL_DATA__.products
+      initialDataUsed.value = true
+      // Clear embedded data to free memory
+      delete window.__INITIAL_DATA__
+      return
+    }
+
     loading.value = true
     error.value = ''
     try {

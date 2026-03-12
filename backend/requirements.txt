@@ -7,3 +7,5 @@ gspread>=6.0.0
 google-api-python-client>=2.100.0
 PyJWT>=2.8.0
 python-dotenv>=1.0.0
+pypdf>=4.0.0
+reportlab>=4.0.0

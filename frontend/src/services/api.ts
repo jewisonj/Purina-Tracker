@@ -1,4 +1,4 @@
-import type { Product, LogEntry, InventoryAdjustment } from '../types'
+import type { Product, LogEntry, InventoryAdjustment, Invoice } from '../types'
 
 const API_BASE = '/api'
 
@@ -118,7 +118,7 @@ export async function getPriceListArchive(): Promise<{ headers: string[]; rows: 
 }
 
 // Invoice filing
-export async function fileInvoice(invoiceData: object, pdfBlob: Blob): Promise<{ message: string; drive_url: string; invoice_number: string }> {
+export async function fileInvoice(invoiceData: object, pdfBlob: Blob): Promise<{ message: string; drive_url: string; invoice_number: string; drive_error?: string }> {
   const token = getToken()
   const formData = new FormData()
   formData.append('invoice_data', JSON.stringify(invoiceData))
@@ -162,4 +162,17 @@ export async function importPriceList(file: File): Promise<{ updated: number; ne
   }
 
   return res.json()
+}
+
+// Invoice list and management
+export async function getInvoices(searchQuery?: string): Promise<{ invoices: Invoice[]; total: number }> {
+  const params = searchQuery ? `?q=${encodeURIComponent(searchQuery)}` : ''
+  return request<{ invoices: Invoice[]; total: number }>(`/invoices${params}`)
+}
+
+export async function updateInvoiceStatus(invoiceNumber: string, paid: boolean): Promise<{ message: string; paid: boolean; watermark_queued?: boolean }> {
+  return request<{ message: string; paid: boolean; watermark_queued?: boolean }>(`/invoices/${encodeURIComponent(invoiceNumber)}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ paid }),
+  })
 }

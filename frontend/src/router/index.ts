@@ -22,6 +22,12 @@ const router = createRouter({
       component: () => import('../views/InvoiceView.vue'),
       meta: { requiresAuth: true, adminOnly: true },
     },
+    {
+      path: '/invoices',
+      name: 'invoices',
+      component: () => import('../views/InvoicesView.vue'),
+      meta: { requiresAuth: true, adminOnly: true },
+    },
   ],
 })
 

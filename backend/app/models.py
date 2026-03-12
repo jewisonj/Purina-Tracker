@@ -84,3 +84,26 @@ class FileInvoiceResponse(BaseModel):
     drive_url: str = ""
     invoice_number: str = ""
     drive_error: str = ""
+
+
+class Invoice(BaseModel):
+    """Invoice record from the Invoices sheet."""
+    invoice_number: str
+    date: str
+    customer: str
+    items_summary: str
+    total: str
+    paid: bool
+    filed_at: str
+    drive_url: str
+
+
+class InvoiceListResponse(BaseModel):
+    """Response for listing invoices."""
+    invoices: list[Invoice]
+    total: int
+
+
+class UpdateInvoiceStatusRequest(BaseModel):
+    """Request to update invoice paid status."""
+    paid: bool

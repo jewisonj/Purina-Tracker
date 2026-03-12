@@ -53,7 +53,12 @@
       "Bash(cmd /c \"\"\"C:\\\\Users\\\\Jack Jewison\\\\.fly\\\\bin\\\\fly.cmd\"\" version\")",
       "Bash(cmd /c \"\"\"C:\\\\Users\\\\Jack Jewison\\\\.fly\\\\bin\\\\fly.cmd\"\" version 2>&1\")",
       "Bash(cmd /c \"flyctl version\")",
-      "Bash(flyctl version:*)"
+      "Bash(flyctl version:*)",
+      "Bash(wc:*)",
+      "Bash(npm install:*)",
+      "Bash(fly deploy:*)",
+      "Bash(powershell.exe -Command \"fly deploy\")",
+      "Bash(powershell.exe -Command \"fly auth login\")"
     ]
   }
 }

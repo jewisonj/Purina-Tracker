@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     google_drive_folder_id: str = ""
 
     # Cache
-    cache_ttl_seconds: int = 30
+    cache_ttl_seconds: int = 300  # 5 minutes for better performance
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
