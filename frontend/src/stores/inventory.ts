@@ -42,7 +42,8 @@ export const useInventoryStore = defineStore('inventory', () => {
     loading.value = true
     error.value = ''
     try {
-      products.value = await api.getProducts()
+      // Pass forceRefresh to API to bypass backend cache when true
+      products.value = await api.getProducts(forceRefresh)
     } catch (e: any) {
       error.value = e.message
     } finally {

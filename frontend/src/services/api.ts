@@ -71,8 +71,9 @@ export function getRole(): string {
 }
 
 // Products
-export async function getProducts(): Promise<Product[]> {
-  return request<Product[]>('/products')
+export async function getProducts(refresh = false): Promise<Product[]> {
+  const query = refresh ? '?refresh=true' : ''
+  return request<Product[]>(`/products${query}`)
 }
 
 export async function updateMarkup(materialNo: string, markupPct: number): Promise<Product> {

@@ -92,7 +92,8 @@ async function quickAdjust(row: DisplayRow, delta: number) {
           severity="secondary"
           text
           size="small"
-          @click="store.fetchProducts()"
+          title="Refresh from Google Sheets"
+          @click="store.fetchProducts(true)"
           :loading="store.loading"
         />
       </div>

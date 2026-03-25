@@ -1,6 +1,6 @@
 """Product routes."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from ..auth import verify_token
 from ..models import Product, MarkupUpdate, ReorderUpdate
@@ -10,8 +10,13 @@ router = APIRouter(tags=["products"])
 
 
 @router.get("/products", response_model=list[Product])
-async def list_products(user: str = Depends(verify_token)):
+async def list_products(
+    user: str = Depends(verify_token),
+    refresh: bool = Query(default=False, description="Force refresh from Google Sheets"),
+):
     svc = get_sheets_service()
+    if refresh:
+        svc._invalidate_cache()
     return svc.get_all_products()
 
 
