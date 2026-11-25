@@ -49,6 +49,7 @@ export const PRODUCT_GROUPS: ProductGroup[] = [
       { displayName: 'Omolene\u00AE #200 Performance', materialNo: '3006181-506', defaultPrice: 27.00 },
       { displayName: 'Omolene\u00AE #300 Mare & Foal', materialNo: '3006182-506', defaultPrice: 27.00 },
       { displayName: 'Omolene\u00AE #400 Complete Advantage\u00AE', materialNo: '3006183-506', defaultPrice: 27.00 },
+      { displayName: 'Omolene\u00AE #500 Competition', materialNo: '3006184-506', defaultPrice: 29.50 },
     ],
   },
   {
@@ -60,6 +61,13 @@ export const PRODUCT_GROUPS: ProductGroup[] = [
   {
     products: [
       { displayName: 'Country Acres 12%', materialNo: '3009502-206', defaultPrice: 12.00 },
+    ],
+  },
+  {
+    products: [
+      { displayName: 'Forage Alfalfa Gastric Support Pellets', materialNo: '303281', defaultPrice: 29.75 },
+      { displayName: 'Forage Beet Pulp Plus Pellets', materialNo: '303286', defaultPrice: 26.00 },
+      { displayName: 'Forage Timothy-Teff Pellets', materialNo: '303284', defaultPrice: 27.50 },
     ],
   },
   {
@@ -96,6 +104,8 @@ export const PRODUCT_GROUPS: ProductGroup[] = [
     products: [
       { displayName: 'Nicker Makers\u00AE Horse Treats', materialNo: '3003256-746-EA', defaultPrice: 6.50 },
       { displayName: 'Outlast\u00AE Horse Treats', materialNo: '3005457-746-EA', defaultPrice: 8.50 },
+      { displayName: 'Peppermint Horse Treats', materialNo: '300523-EA', defaultPrice: 6.50 },
+      { displayName: 'Honey Apple Crisp Horse Treats', materialNo: '300516-EA', defaultPrice: 6.50 },
     ],
   },
 ]
