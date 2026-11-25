@@ -64,6 +64,13 @@ export const PRODUCT_GROUPS: ProductGroup[] = [
   },
   {
     products: [
+      { displayName: 'Forage Alfalfa Gastric Support Pellets', materialNo: '303281', defaultPrice: 29.75 },
+      { displayName: 'Forage Beet Pulp Plus Pellets', materialNo: '303286', defaultPrice: 26.00 },
+      { displayName: 'Forage Timothy-Teff Pellets', materialNo: '303284', defaultPrice: 27.50 },
+    ],
+  },
+  {
+    products: [
       { displayName: 'Enrich Plus\u00AE Ration Balancing', materialNo: '3002564-206', defaultPrice: 38.00 },
       { displayName: 'Omega Match\u00AE Ration Balancing', materialNo: '3005939-205', defaultPrice: 46.00 },
       { displayName: 'Omega Match\u00AE Ahiflower\u00AE Oil Supplement', materialNo: '3005953-946-EA', defaultPrice: 40.00 },
