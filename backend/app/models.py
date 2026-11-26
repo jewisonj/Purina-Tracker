@@ -79,6 +79,7 @@ class FileInvoiceRequest(BaseModel):
     subtotal: float = 0
     invoice_discount: float = 0
     discount_total: float = 0
+    discount_note: str = ""
     total: float
     paid: bool = False
 

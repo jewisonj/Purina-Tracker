@@ -99,6 +99,9 @@ async def file_invoice(
         discount_total = 0.0
     if discount_total > 0:
         items_summary += f"; Discount -${discount_total:.2f}"
+        discount_note = str(data.get("discount_note", "") or "").strip()[:80]
+        if discount_note:
+            items_summary += f" ({discount_note})"
 
     pdf_bytes = await pdf.read()
 

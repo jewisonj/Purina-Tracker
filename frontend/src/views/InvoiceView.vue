@@ -41,6 +41,9 @@ const lineItems = ref<LineItem[]>([newLine()])
 const invoiceDiscountType = ref<DiscountType>('amount')
 const invoiceDiscountValue = ref<number | null>(null)
 
+/** Optional reason for the discount, printed on the invoice (e.g. "Black Friday sale") */
+const discountNote = ref('')
+
 /** Map material_no → Product from API */
 const productMap = computed(() => {
   const map = new Map<string, Product>()
@@ -88,8 +91,20 @@ function getGross(item: LineItem): number {
   return round2(item.qty * getPrice(item.selectedConfig))
 }
 
+/** Item discount. A dollar amount is per unit, so it is multiplied by the quantity; a percent applies to the whole line. */
 function getLineDiscount(item: LineItem): number {
-  return calcDiscount(getGross(item), item.discountType, item.discountValue)
+  const gross = getGross(item)
+  if (item.discountType === 'percent') {
+    return calcDiscount(gross, 'percent', item.discountValue)
+  }
+  const perUnit = Number(item.discountValue) || 0
+  return calcDiscount(gross, 'amount', perUnit * (item.qty || 0))
+}
+
+/** Text for an item discount, e.g. "10%" or "$2.00 each" */
+function lineDiscountLabel(item: LineItem): string {
+  const label = discountLabel(item.discountType, item.discountValue)
+  return item.discountType === 'amount' && item.qty > 1 ? `${label} each` : label
 }
 
 /** Line amount after its own discount */
@@ -134,6 +149,7 @@ function clearInvoice() {
   lineItems.value = [newLine()]
   invoiceDiscountType.value = 'amount'
   invoiceDiscountValue.value = null
+  discountNote.value = ''
   paid.value = false
 }
 
@@ -191,7 +207,7 @@ function generatePDFDoc(validItems: LineItem[], isPaid = false): jsPDF {
     if (lineDisc > 0) {
       discountRowIdx.add(tableRows.length)
       tableRows.push([
-        `    Discount (${discountLabel(item.discountType, item.discountValue)})`,
+        `    Discount (${lineDiscountLabel(item)})`,
         '', '',
         `-$${lineDisc.toFixed(2)}`,
       ])
@@ -247,8 +263,18 @@ function generatePDFDoc(validItems: LineItem[], isPaid = false): jsPDF {
   })
 
   // Footer
-  const finalY = (doc as any).lastAutoTable?.finalY || 200
+  let finalY = (doc as any).lastAutoTable?.finalY || 200
   doc.setFontSize(10)
+
+  // Optional discount note, only when a discount was actually given
+  const note = discountNote.value.trim()
+  if (note && totalDiscount.value > 0) {
+    doc.setFont('helvetica', 'normal')
+    const noteLines = doc.splitTextToSize(`Discount note: ${note}`, pageWidth - 28)
+    doc.text(noteLines, 14, finalY + 8)
+    finalY += 4 + noteLines.length * 5
+  }
+
   doc.setFont('helvetica', 'italic')
   doc.text('Thank you for your business!', pageWidth / 2, finalY + 12, { align: 'center' })
 
@@ -306,6 +332,7 @@ async function fileInvoiceHandler() {
       subtotal: invoiceSubtotal.value,
       invoice_discount: invoiceDiscount.value,
       discount_total: totalDiscount.value,
+      discount_note: totalDiscount.value > 0 ? discountNote.value.trim() : '',
       total: invoiceTotal.value,
       paid: paid.value,
     }
@@ -437,7 +464,7 @@ async function pullInventory() {
 
           <!-- Row 3: optional discount on this item -->
           <div v-if="item.selectedConfig" class="discount-row">
-            <span class="detail-label">Item discount</span>
+            <span class="detail-label">{{ item.discountType === 'amount' ? 'Discount each' : 'Item discount' }}</span>
             <div class="discount-control">
               <div class="discount-toggle">
                 <button
@@ -499,6 +526,13 @@ async function pullInventory() {
             −${{ invoiceDiscount.toFixed(2) }}
           </span>
         </div>
+
+        <InputText
+          v-model="discountNote"
+          placeholder="Discount note (optional), e.g. Black Friday sale"
+          maxlength="80"
+          class="discount-note"
+        />
 
         <div v-if="invoiceDiscount > 0" class="totals-line">
           <span>Subtotal:</span>
@@ -758,6 +792,11 @@ async function pullInventory() {
   font-size: 14px;
   font-weight: 600;
   color: var(--primary);
+}
+
+.discount-note {
+  width: 100%;
+  margin-top: 10px;
 }
 
 /* --- Totals --- */
