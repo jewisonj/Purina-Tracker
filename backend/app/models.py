@@ -68,6 +68,7 @@ class InvoiceItem(BaseModel):
     material_no: str
     qty: int
     unit_price: float
+    discount: float = 0
     extended: float
 
 
@@ -75,6 +76,9 @@ class FileInvoiceRequest(BaseModel):
     customer_name: str
     invoice_date: str
     items: list[InvoiceItem]
+    subtotal: float = 0
+    invoice_discount: float = 0
+    discount_total: float = 0
     total: float
     paid: bool = False
 

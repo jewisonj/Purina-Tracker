@@ -22,12 +22,24 @@ onMounted(() => {
 const customerName = ref('')
 const invoiceDate = ref(new Date().toISOString().split('T')[0])
 
+type DiscountType = 'amount' | 'percent'
+
 interface LineItem {
   selectedConfig: ProductConfig | null
   qty: number
+  discountType: DiscountType
+  discountValue: number | null
 }
 
-const lineItems = ref<LineItem[]>([{ selectedConfig: null, qty: 1 }])
+function newLine(): LineItem {
+  return { selectedConfig: null, qty: 1, discountType: 'amount', discountValue: null }
+}
+
+const lineItems = ref<LineItem[]>([newLine()])
+
+/** Whole-invoice discount, applied after any per-item discounts */
+const invoiceDiscountType = ref<DiscountType>('amount')
+const invoiceDiscountValue = ref<number | null>(null)
 
 /** Map material_no → Product from API */
 const productMap = computed(() => {
@@ -52,20 +64,61 @@ function getPrice(cfg: ProductConfig): number {
   return p ? p.retail_with_tax : cfg.defaultPrice
 }
 
-function getExtended(item: LineItem): number {
-  if (!item.selectedConfig || !item.qty) return 0
-  return item.qty * getPrice(item.selectedConfig)
+function round2(n: number): number {
+  return Math.round(n * 100) / 100
 }
 
-const invoiceTotal = computed(() => {
-  return lineItems.value.reduce((sum, item) => sum + getExtended(item), 0)
+/** Dollar value of a discount against a base amount. Never negative, never more than the base. */
+function calcDiscount(base: number, type: DiscountType, value: number | null | string): number {
+  const v = Number(value) || 0
+  if (v <= 0 || base <= 0) return 0
+  const d = type === 'percent' ? base * Math.min(v, 100) / 100 : Math.min(v, base)
+  return round2(d)
+}
+
+/** Text shown next to a discount, e.g. "10%" or "$5.00" */
+function discountLabel(type: DiscountType, value: number | null | string): string {
+  const v = Number(value) || 0
+  return type === 'percent' ? `${Math.min(v, 100)}%` : `$${v.toFixed(2)}`
+}
+
+/** Line amount before any discount */
+function getGross(item: LineItem): number {
+  if (!item.selectedConfig || !item.qty) return 0
+  return round2(item.qty * getPrice(item.selectedConfig))
+}
+
+function getLineDiscount(item: LineItem): number {
+  return calcDiscount(getGross(item), item.discountType, item.discountValue)
+}
+
+/** Line amount after its own discount */
+function getExtended(item: LineItem): number {
+  return round2(getGross(item) - getLineDiscount(item))
+}
+
+/** Sum of lines after per-item discounts */
+const invoiceSubtotal = computed(() => {
+  return round2(lineItems.value.reduce((sum, item) => sum + getExtended(item), 0))
 })
+
+const lineDiscountTotal = computed(() => {
+  return round2(lineItems.value.reduce((sum, item) => sum + getLineDiscount(item), 0))
+})
+
+const invoiceDiscount = computed(() => {
+  return calcDiscount(invoiceSubtotal.value, invoiceDiscountType.value, invoiceDiscountValue.value)
+})
+
+const totalDiscount = computed(() => round2(lineDiscountTotal.value + invoiceDiscount.value))
+
+const invoiceTotal = computed(() => round2(invoiceSubtotal.value - invoiceDiscount.value))
 
 /** Auto-add a new row when the last row gets a product selected */
 watch(lineItems, (items) => {
   const last = items[items.length - 1]
   if (last && last.selectedConfig) {
-    items.push({ selectedConfig: null, qty: 1 })
+    items.push(newLine())
   }
 }, { deep: true })
 
@@ -78,7 +131,9 @@ function removeRow(index: number) {
 function clearInvoice() {
   customerName.value = ''
   invoiceDate.value = new Date().toISOString().split('T')[0]
-  lineItems.value = [{ selectedConfig: null, qty: 1 }]
+  lineItems.value = [newLine()]
+  invoiceDiscountType.value = 'amount'
+  invoiceDiscountValue.value = null
   paid.value = false
 }
 
@@ -121,17 +176,37 @@ function generatePDFDoc(validItems: LineItem[], isPaid = false): jsPDF {
   doc.text(`Customer:  ${customerName.value.trim()}`, 14, infoY)
   doc.text(`Date:  ${invoiceDate.value}`, 14, infoY + 7)
 
-  // Table
-  const tableRows = validItems.map(item => {
+  // Table. A discounted item gets its own "Discount" row right under it.
+  const tableRows: string[][] = []
+  const discountRowIdx = new Set<number>()
+  for (const item of validItems) {
     const price = getPrice(item.selectedConfig!)
-    const extended = item.qty * price
-    return [
+    tableRows.push([
       item.selectedConfig!.displayName,
       item.qty.toString(),
       `$${price.toFixed(2)}`,
-      `$${extended.toFixed(2)}`,
-    ]
-  })
+      `$${getGross(item).toFixed(2)}`,
+    ])
+    const lineDisc = getLineDiscount(item)
+    if (lineDisc > 0) {
+      discountRowIdx.add(tableRows.length)
+      tableRows.push([
+        `    Discount (${discountLabel(item.discountType, item.discountValue)})`,
+        '', '',
+        `-$${lineDisc.toFixed(2)}`,
+      ])
+    }
+  }
+
+  // Whole-invoice discount: show the subtotal, then the discount
+  if (invoiceDiscount.value > 0) {
+    tableRows.push(['', '', 'Subtotal:', `$${invoiceSubtotal.value.toFixed(2)}`])
+    discountRowIdx.add(tableRows.length)
+    const pct = invoiceDiscountType.value === 'percent'
+      ? ` (${discountLabel('percent', invoiceDiscountValue.value)})`
+      : ''
+    tableRows.push(['', '', `Discount${pct}:`, `-$${invoiceDiscount.value.toFixed(2)}`])
+  }
 
   // Total row
   tableRows.push([
@@ -155,10 +230,14 @@ function generatePDFDoc(validItems: LineItem[], isPaid = false): jsPDF {
     columnStyles: {
       0: { cellWidth: 'auto' },
       1: { cellWidth: 20, halign: 'center' },
-      2: { cellWidth: 32, halign: 'right' },
+      2: { cellWidth: 40, halign: 'right' },
       3: { cellWidth: 32, halign: 'right' },
     },
     didParseCell: (data: any) => {
+      if (data.section !== 'body') return
+      if (discountRowIdx.has(data.row.index)) {
+        data.cell.styles.fontStyle = 'italic'
+      }
       // Bold the total row
       if (data.row.index === tableRows.length - 1) {
         data.cell.styles.fontStyle = 'bold'
@@ -221,8 +300,12 @@ async function fileInvoiceHandler() {
         material_no: item.selectedConfig!.materialNo,
         qty: item.qty,
         unit_price: getPrice(item.selectedConfig!),
+        discount: getLineDiscount(item),
         extended: getExtended(item),
       })),
+      subtotal: invoiceSubtotal.value,
+      invoice_discount: invoiceDiscount.value,
+      discount_total: totalDiscount.value,
       total: invoiceTotal.value,
       paid: paid.value,
     }
@@ -351,13 +434,84 @@ async function pullInventory() {
               <strong class="detail-value">${{ getExtended(item).toFixed(2) }}</strong>
             </div>
           </div>
+
+          <!-- Row 3: optional discount on this item -->
+          <div v-if="item.selectedConfig" class="discount-row">
+            <span class="detail-label">Item discount</span>
+            <div class="discount-control">
+              <div class="discount-toggle">
+                <button
+                  type="button"
+                  :class="{ active: item.discountType === 'amount' }"
+                  @click="item.discountType = 'amount'"
+                >$</button>
+                <button
+                  type="button"
+                  :class="{ active: item.discountType === 'percent' }"
+                  @click="item.discountType = 'percent'"
+                >%</button>
+              </div>
+              <input
+                v-model.number="item.discountValue"
+                type="number"
+                inputmode="decimal"
+                min="0"
+                step="0.01"
+                placeholder="0"
+                class="discount-input"
+              />
+            </div>
+            <span v-if="getLineDiscount(item) > 0" class="discount-amount">
+              −${{ getLineDiscount(item).toFixed(2) }}
+            </span>
+          </div>
         </div>
       </div>
 
-      <!-- Total -->
-      <div class="invoice-total">
-        <span>Total:</span>
-        <strong>${{ invoiceTotal.toFixed(2) }}</strong>
+      <!-- Totals -->
+      <div class="invoice-totals">
+        <div class="discount-row discount-row--invoice">
+          <span class="detail-label">Invoice discount</span>
+          <div class="discount-control">
+            <div class="discount-toggle">
+              <button
+                type="button"
+                :class="{ active: invoiceDiscountType === 'amount' }"
+                @click="invoiceDiscountType = 'amount'"
+              >$</button>
+              <button
+                type="button"
+                :class="{ active: invoiceDiscountType === 'percent' }"
+                @click="invoiceDiscountType = 'percent'"
+              >%</button>
+            </div>
+            <input
+              v-model.number="invoiceDiscountValue"
+              type="number"
+              inputmode="decimal"
+              min="0"
+              step="0.01"
+              placeholder="0"
+              class="discount-input"
+            />
+          </div>
+          <span v-if="invoiceDiscount > 0" class="discount-amount">
+            −${{ invoiceDiscount.toFixed(2) }}
+          </span>
+        </div>
+
+        <div v-if="invoiceDiscount > 0" class="totals-line">
+          <span>Subtotal:</span>
+          <span>${{ invoiceSubtotal.toFixed(2) }}</span>
+        </div>
+        <div v-if="totalDiscount > 0" class="totals-line totals-line--discount">
+          <span>Total discount:</span>
+          <span>−${{ totalDiscount.toFixed(2) }}</span>
+        </div>
+        <div class="invoice-total">
+          <span>Total:</span>
+          <strong>${{ invoiceTotal.toFixed(2) }}</strong>
+        </div>
       </div>
 
       <!-- Footer: Paid + Pull Inventory -->
@@ -541,17 +695,100 @@ async function pullInventory() {
   background: var(--surface);
 }
 
-/* --- Total bar --- */
-.invoice-total {
+/* --- Discounts --- */
+.discount-row {
   display: flex;
-  justify-content: flex-end;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.discount-row--invoice {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.discount-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.discount-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.discount-toggle button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--surface-hover, #333);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.discount-toggle button.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+.discount-input {
+  width: 76px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  text-align: right;
+}
+
+.discount-amount {
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+/* --- Totals --- */
+.invoice-totals {
   margin-top: 12px;
   padding: 12px 16px;
   background: var(--surface);
   border-top: 2px solid var(--primary);
   border-radius: 0 0 8px 8px;
+  color: var(--text);
+}
+
+.totals-line {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.totals-line--discount {
+  color: var(--primary);
+}
+
+.invoice-total {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
   font-size: 16px;
   color: var(--text);
 }
