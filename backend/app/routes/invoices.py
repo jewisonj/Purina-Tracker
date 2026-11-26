@@ -92,6 +92,14 @@ async def file_invoice(
         f"{it.get('product_name', '?')} x{it.get('qty', 0)}" for it in items
     )
 
+    # Note any discount (per-item plus whole-invoice) so the sheet explains the lower total
+    try:
+        discount_total = float(data.get("discount_total", 0) or 0)
+    except (TypeError, ValueError):
+        discount_total = 0.0
+    if discount_total > 0:
+        items_summary += f"; Discount -${discount_total:.2f}"
+
     pdf_bytes = await pdf.read()
 
     svc = get_sheets_service()
